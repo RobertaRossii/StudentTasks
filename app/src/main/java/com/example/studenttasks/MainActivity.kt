@@ -54,8 +54,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// SEZIONE 3 - STATO CONDIVISO E NAVIGAZIONE
-
 @Composable
 fun StudentTasksApp(modifier: Modifier = Modifier) {
 
@@ -88,8 +86,6 @@ fun StudentTasksApp(modifier: Modifier = Modifier) {
         modifier = modifier
     ) {
 
-        // SCHERMATA HOME
-
         composable("home") {
             HomeScreen(
                 tasks = tasks,
@@ -110,8 +106,6 @@ fun StudentTasksApp(modifier: Modifier = Modifier) {
                 },
                 onDelete = { taskToDelete ->
 
-                    // CHALLENGE 2 - DEBUG LOGGING
-
                     Log.d(
                         "StudentTasks",
                         "Deleting task ${taskToDelete.id}: ${taskToDelete.title}"
@@ -123,8 +117,6 @@ fun StudentTasksApp(modifier: Modifier = Modifier) {
                 }
             )
         }
-
-        // SCHERMATA ADD TASK
 
         composable("add") {
             AddTaskScreen(
@@ -149,8 +141,6 @@ fun StudentTasksApp(modifier: Modifier = Modifier) {
                 }
             )
         }
-
-        // CHALLENGE 1 - SCHERMATA ABOUT
 
         composable("about") {
             Column(
@@ -179,8 +169,6 @@ fun StudentTasksApp(modifier: Modifier = Modifier) {
         }
     }
 }
-
-// SEZIONE 4 - HOME SCREEN
 
 @Composable
 fun HomeScreen(
@@ -236,8 +224,6 @@ fun HomeScreen(
     }
 }
 
-// SEZIONE 5 - ADD TASK SCREEN
-
 @Composable
 fun AddTaskScreen(
     onSave: (String) -> Unit,
@@ -290,8 +276,6 @@ fun AddTaskScreen(
     }
 }
 
-// LISTA ATTIVITA - DAL CAPITOLO 6
-
 @Composable
 fun TaskList(
     tasks: List<Task>,
@@ -319,8 +303,6 @@ fun TaskList(
         }
     }
 }
-
-// RIGA ATTIVITA - DAL CAPITOLO 6
 
 @Composable
 fun TaskRow(
