@@ -2,6 +2,7 @@
 package com.example.studenttasks
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
@@ -10,15 +11,28 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.example.studenttasks.ui.theme.StudentTasksTheme
 
 class MainActivity : ComponentActivity() {
@@ -40,10 +54,146 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// SEZIONE 3 - STATO CONDIVISO E NAVIGAZIONE
+
 @Composable
 fun StudentTasksApp(modifier: Modifier = Modifier) {
-    Column(
+
+    val navController = rememberNavController()
+
+    var tasks by remember {
+        mutableStateOf(
+            listOf(
+                Task(
+                    1,
+                    "Prepare Kotlin exercise",
+                    priority = Priority.HIGH
+                ),
+                Task(
+                    2,
+                    "Read Android documentation"
+                ),
+                Task(
+                    3,
+                    "Run the app",
+                    isCompleted = true
+                )
+            )
+        )
+    }
+
+    NavHost(
+        navController = navController,
+        startDestination = "home",
         modifier = modifier
+    ) {
+
+        // SCHERMATA HOME
+
+        composable("home") {
+            HomeScreen(
+                tasks = tasks,
+                onAddTask = {
+                    navController.navigate("add")
+                },
+                onAbout = {
+                    navController.navigate("about")
+                },
+                onCompletedChange = { changedTask, isCompleted ->
+                    tasks = tasks.map { task ->
+                        if (task.id == changedTask.id) {
+                            task.copy(isCompleted = isCompleted)
+                        } else {
+                            task
+                        }
+                    }
+                },
+                onDelete = { taskToDelete ->
+
+                    // CHALLENGE 2 - DEBUG LOGGING
+
+                    Log.d(
+                        "StudentTasks",
+                        "Deleting task ${taskToDelete.id}: ${taskToDelete.title}"
+                    )
+
+                    tasks = tasks.filter { task ->
+                        task.id != taskToDelete.id
+                    }
+                }
+            )
+        }
+
+        // SCHERMATA ADD TASK
+
+        composable("add") {
+            AddTaskScreen(
+                onSave = { title ->
+
+                    Log.d(
+                        "StudentTasks",
+                        "Adding task: $title"
+                    )
+
+                    val task = Task(
+                        id = (tasks.maxOfOrNull { it.id } ?: 0) + 1,
+                        title = title
+                    )
+
+                    tasks = tasks + task
+
+                    navController.popBackStack()
+                },
+                onCancel = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        // CHALLENGE 1 - SCHERMATA ABOUT
+
+        composable("about") {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Student Tasks",
+                    style = MaterialTheme.typography.headlineLarge
+                )
+
+                Text(
+                    "Introductory Kotlin/Android application"
+                )
+
+                Button(
+                    onClick = {
+                        navController.popBackStack()
+                    }
+                ) {
+                    Text("Back")
+                }
+            }
+        }
+    }
+}
+
+// SEZIONE 4 - HOME SCREEN
+
+@Composable
+fun HomeScreen(
+    tasks: List<Task>,
+    onAddTask: () -> Unit,
+    onAbout: () -> Unit,
+    onCompletedChange: (Task, Boolean) -> Unit,
+    onDelete: (Task) -> Unit
+) {
+    val completedCount = tasks.count { it.isCompleted }
+
+    Column(
+        modifier = Modifier
             .fillMaxSize()
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -53,60 +203,166 @@ fun StudentTasksApp(modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.headlineLarge
         )
 
-        Text("3 tasks")
+        Text(
+            "$completedCount of ${tasks.size} completed"
+        )
 
-        Button(
-            onClick = { }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("Add Task")
+            Button(
+                onClick = onAddTask
+            ) {
+                Text("Add Task")
+            }
+
+            OutlinedButton(
+                onClick = onAbout
+            ) {
+                Text("About")
+            }
         }
 
-        Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            TaskRow(
-                title = "Prepare Kotlin exercise",
-                isCompleted = false,
-                priority = Priority.HIGH
-            )
-
-            TaskRow(
-                title = "Read Android documentation",
-                isCompleted = false,
-                priority = Priority.MEDIUM
-            )
-
-            TaskRow(
-                title = "Run the app",
-                isCompleted = true,
-                priority = Priority.LOW
+        if (tasks.isEmpty()) {
+            Text("No tasks yet.")
+        } else {
+            TaskList(
+                tasks = tasks,
+                onCompletedChange = onCompletedChange,
+                onDelete = onDelete,
+                modifier = Modifier.weight(1f)
             )
         }
     }
 }
 
+// SEZIONE 5 - ADD TASK SCREEN
+
+@Composable
+fun AddTaskScreen(
+    onSave: (String) -> Unit,
+    onCancel: () -> Unit
+) {
+    var title by rememberSaveable {
+        mutableStateOf("")
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = "Add Task",
+            style = MaterialTheme.typography.headlineLarge
+        )
+
+        OutlinedTextField(
+            value = title,
+            onValueChange = { newValue ->
+                title = newValue
+            },
+            label = {
+                Text("Task title")
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = {
+                    onSave(title.trim())
+                },
+                enabled = title.isNotBlank()
+            ) {
+                Text("Save")
+            }
+
+            OutlinedButton(
+                onClick = onCancel
+            ) {
+                Text("Cancel")
+            }
+        }
+    }
+}
+
+// LISTA ATTIVITA - DAL CAPITOLO 6
+
+@Composable
+fun TaskList(
+    tasks: List<Task>,
+    onCompletedChange: (Task, Boolean) -> Unit,
+    onDelete: (Task) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(
+            items = tasks,
+            key = { task -> task.id }
+        ) { task ->
+            TaskRow(
+                task = task,
+                onCompletedChange = { isCompleted ->
+                    onCompletedChange(task, isCompleted)
+                },
+                onDelete = {
+                    onDelete(task)
+                }
+            )
+        }
+    }
+}
+
+// RIGA ATTIVITA - DAL CAPITOLO 6
+
 @Composable
 fun TaskRow(
-    title: String,
-    isCompleted: Boolean,
-    priority: Priority
+    task: Task,
+    onCompletedChange: (Boolean) -> Unit,
+    onDelete: () -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Checkbox(
-            checked = isCompleted,
-            onCheckedChange = null
+            checked = task.isCompleted,
+            onCheckedChange = onCompletedChange
         )
 
-        Text(
-            text = title,
+        Column(
             modifier = Modifier
-                .padding(start = 8.dp)
+                .padding(horizontal = 8.dp)
                 .weight(1f)
-        )
+        ) {
+            Text(
+                text = task.title,
+                textDecoration = if (task.isCompleted) {
+                    TextDecoration.LineThrough
+                } else {
+                    null
+                }
+            )
 
-        Text(priority.name)
+            Text(
+                text = task.priority.name,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+
+        OutlinedButton(
+            onClick = onDelete
+        ) {
+            Text("Delete")
+        }
     }
 }
