@@ -34,20 +34,17 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.studenttasks.ui.theme.StudentTasksTheme
+import androidx.compose.material3.RadioButton
+
 
 class MainActivity : ComponentActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
             StudentTasksTheme {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize()
-                ) { innerPadding ->
-                    StudentTasksApp(
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                    StudentTasksApp(modifier = Modifier.padding(innerPadding))
                 }
             }
         }
@@ -56,44 +53,39 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun StudentTasksApp(modifier: Modifier = Modifier) {
-
     val navController = rememberNavController()
-
     var tasks by remember {
         mutableStateOf(
             listOf(
                 Task(
-                    1,
-                    "Prepare Kotlin exercise",
+                    id = 1,
+                    title = "Prepare Kotlin exercise",
                     priority = Priority.HIGH
                 ),
                 Task(
-                    2,
-                    "Read Android documentation"
+                    id = 2,
+                    title = "Read Android documentation",
+                    priority = Priority.MEDIUM
                 ),
                 Task(
-                    3,
-                    "Run the app",
-                    isCompleted = true
+                    id = 3,
+                    title = "Run the app",
+                    isCompleted = true,
+                    priority = Priority.LOW
                 )
             )
         )
     }
-
     NavHost(
         navController = navController,
         startDestination = "home",
         modifier = modifier
     ) {
-
         composable("home") {
             HomeScreen(
                 tasks = tasks,
                 onAddTask = {
                     navController.navigate("add")
-                },
-                onAbout = {
-                    navController.navigate("about")
                 },
                 onCompletedChange = { changedTask, isCompleted ->
                     tasks = tasks.map { task ->
@@ -105,35 +97,38 @@ fun StudentTasksApp(modifier: Modifier = Modifier) {
                     }
                 },
                 onDelete = { taskToDelete ->
-
                     Log.d(
                         "StudentTasks",
                         "Deleting task ${taskToDelete.id}: ${taskToDelete.title}"
                     )
 
-                    tasks = tasks.filter { task ->
-                        task.id != taskToDelete.id
+                    tasks = tasks.filter {
+                        it.id != taskToDelete.id
                     }
+                },
+                onClearCompleted = {
+                    tasks = tasks.filter { !it.isCompleted }
+                },
+                onAbout = {
+                    navController.navigate("about")
                 }
             )
         }
-
         composable("add") {
             AddTaskScreen(
-                onSave = { title ->
-
+                tasks = tasks,
+                onSave = { title, priority ->
                     Log.d(
                         "StudentTasks",
                         "Adding task: $title"
                     )
-
                     val task = Task(
                         id = (tasks.maxOfOrNull { it.id } ?: 0) + 1,
-                        title = title
+                        title = title,
+                        priority = priority
                     )
 
                     tasks = tasks + task
-
                     navController.popBackStack()
                 },
                 onCancel = {
@@ -141,12 +136,9 @@ fun StudentTasksApp(modifier: Modifier = Modifier) {
                 }
             )
         }
-
         composable("about") {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
+                modifier = Modifier.padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
@@ -170,15 +162,23 @@ fun StudentTasksApp(modifier: Modifier = Modifier) {
     }
 }
 
+
 @Composable
 fun HomeScreen(
     tasks: List<Task>,
     onAddTask: () -> Unit,
-    onAbout: () -> Unit,
     onCompletedChange: (Task, Boolean) -> Unit,
-    onDelete: (Task) -> Unit
+    onDelete: (Task) -> Unit,
+    onClearCompleted: () -> Unit,
+    onAbout: () -> Unit
 ) {
     val completedCount = tasks.count { it.isCompleted }
+
+    val progressPercent = if (tasks.isEmpty()) {
+        0
+    } else {
+        completedCount * 100 / tasks.size
+    }
 
     Column(
         modifier = Modifier
@@ -192,23 +192,28 @@ fun HomeScreen(
         )
 
         Text(
-            "$completedCount of ${tasks.size} completed"
+            text = "$completedCount of ${tasks.size} completed"
         )
 
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                onClick = onAddTask
-            ) {
-                Text("Add Task")
-            }
+        Text("Progress: $progressPercent%")
 
-            OutlinedButton(
-                onClick = onAbout
-            ) {
-                Text("About")
-            }
+        Button(
+            onClick = onAddTask
+        ) {
+            Text("Add Task")
+        }
+
+        Button(
+            onClick = onAbout
+        ) {
+            Text("About")
+        }
+
+        OutlinedButton(
+            onClick = onClearCompleted,
+            enabled = tasks.any { it.isCompleted }
+        ) {
+            Text("Clear completed")
         }
 
         if (tasks.isEmpty()) {
@@ -226,11 +231,23 @@ fun HomeScreen(
 
 @Composable
 fun AddTaskScreen(
-    onSave: (String) -> Unit,
+    tasks: List<Task>,
+    onSave: (String, Priority) -> Unit,
     onCancel: () -> Unit
 ) {
     var title by rememberSaveable {
         mutableStateOf("")
+    }
+
+    val duplicateTitle = tasks.any { task ->
+        task.title.equals(
+            title.trim(),
+            ignoreCase = true
+        )
+    }
+
+    var selectedPriority by remember {
+        mutableStateOf(Priority.MEDIUM)
     }
 
     Column(
@@ -255,14 +272,29 @@ fun AddTaskScreen(
             modifier = Modifier.fillMaxWidth()
         )
 
+        Priority.entries.forEach { priority ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(
+                    selected = selectedPriority == priority,
+                    onClick = {
+                        selectedPriority = priority
+                    }
+                )
+
+                Text(priority.name)
+            }
+        }
+
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(
                 onClick = {
-                    onSave(title.trim())
+                    onSave(title.trim(), selectedPriority)
                 },
-                enabled = title.isNotBlank()
+                enabled = title.isNotBlank() && !duplicateTitle
             ) {
                 Text("Save")
             }
@@ -272,34 +304,6 @@ fun AddTaskScreen(
             ) {
                 Text("Cancel")
             }
-        }
-    }
-}
-
-@Composable
-fun TaskList(
-    tasks: List<Task>,
-    onCompletedChange: (Task, Boolean) -> Unit,
-    onDelete: (Task) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    LazyColumn(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(
-            items = tasks,
-            key = { task -> task.id }
-        ) { task ->
-            TaskRow(
-                task = task,
-                onCompletedChange = { isCompleted ->
-                    onCompletedChange(task, isCompleted)
-                },
-                onDelete = {
-                    onDelete(task)
-                }
-            )
         }
     }
 }
@@ -348,3 +352,90 @@ fun TaskRow(
         }
     }
 }
+
+@Composable
+fun CounterExample() {
+    var count by remember { mutableStateOf(0) }
+
+    Column {
+        Text("Tasks: $count")
+
+        Button(
+            onClick = {
+                count++
+            }
+        ) {
+            Text("Add")
+        }
+    }
+}
+
+@Composable
+fun AddTaskExample() {
+    var taskTitle by rememberSaveable {
+        mutableStateOf("")
+    }
+    var addAttempts by remember {
+        mutableStateOf(0)
+    }
+
+    Column {
+        OutlinedTextField(
+            value = taskTitle,
+            onValueChange = { newValue ->
+                taskTitle = newValue
+            },
+            label = {
+                Text("Task title")
+            }
+        )
+
+        Text("You typed: $taskTitle")
+        Button(
+            onClick = {
+                taskTitle = ""
+            }
+        ) {
+            Text("Clear")
+        }
+        Button(
+            onClick = {
+                addAttempts++
+            },
+            enabled = taskTitle.isNotBlank()
+        ) {
+            Text("Add Task")
+        }
+
+        Text("Tasks added: $addAttempts")
+
+    }
+}
+@Composable
+fun TaskList(
+    tasks: List<Task>,
+    onCompletedChange: (Task, Boolean) -> Unit,
+    onDelete: (Task) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(
+            items = tasks,
+            key = { task -> task.id }
+        ) { task ->
+            TaskRow(
+                task = task,
+                onCompletedChange = { isCompleted ->
+                    onCompletedChange(task, isCompleted)
+                },
+                onDelete = {
+                    onDelete(task)
+                }
+            )
+        }
+    }
+}
+
